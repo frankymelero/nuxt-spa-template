@@ -59,7 +59,7 @@
                         <div class="form-row">
                             <div class="col-sm-6">
                                 <div class="form-group">
-                                    <select v-model="formData.selectedservice" class="custom-select bg-transparent px-4" id="services-select" style="height: 47px;">
+                                    <select v-model="formData.selectedservice" @change="calculateServiceTime" class="custom-select bg-transparent px-4" id="services-select" style="height: 47px;">
                                         <option value="-1">Select A Service</option>
                                         <option v-for="service in availableServices" :key="service.id" :value="service.id">{{ service.title + " (" + service.duration }} minutes)</option>
                                     </select>
@@ -70,6 +70,7 @@
                             </div>
                         </div>
                     </form>
+                    <p style="text-align: center;">{{ errorlogger }}</p>
                 </div>
             </div>
         </div>
@@ -79,6 +80,7 @@
 
 <script setup>
 import { faBatteryEmpty } from '@fortawesome/free-solid-svg-icons';
+import emailjs from 'emailjs-com';
 
 const services = [
   {
@@ -125,32 +127,8 @@ const services = [
   },
 ];
 
-const apidatamock = [
-
-  {
-    reservationId: "d2D2a6fs",
-    date: "2023-09-21",
-    hour: "08:45",
-    duration: 30,
-    serviceId: 3
-  },
-  {
-    reservationId: "d226a6ss",
-    date: "2023-09-21",
-    hour: "11:00",
-    duration: 45,
-    serviceId: 1
-  },
-  {
-    reservationId: "d226a6ss",
-    date: "2023-09-21",
-    hour: "18:30",
-    duration: 30,
-    serviceId: 2
-  }
-
-
-];
+const errorlogger = ref("");
+let apidatamock = [];
 
 const openedHours = ref({
   // UTC time. Adjust according your needs. Note that this is made to consider Winter/summer hours, therefore use gmt hours and you won't need to change this.
@@ -166,7 +144,7 @@ const formData = ref({
   date: '',
   time: '',
   selectedservice: '-1',
-  selectedserviceId: '-1',
+  selectedservicetime: 0,
 });
 
 
@@ -229,15 +207,13 @@ const calculateAvailableTimes = () => {
     let durationFound = null;
 
  
-    // Función de callback para comprobar si el valor está presente y obtener la duración
-    const isReserved = reservedTimes.some(item => {
-    
-  
+
+    const isReserved = reservedTimes.some(item => {  
       if (item.hour === minutesToTime(currentMinutes) && formData.value.date === item.date) {
         durationFound = item.duration;
-        return true; // Coincidencia encontrada
+        return true; 
       }
-      return false; // Sin coincidencia
+      return false; 
     });
 
 
@@ -265,6 +241,7 @@ watch(() => formData.value.date, (newDate, oldDate) => {
 
 // Llama a calculateAvailableTimes una vez al inicio para la fecha inicial
 onMounted(() => {
+  fetchAppointmentData();
   calculateAvailableTimes();
 
 });
@@ -281,10 +258,7 @@ function minutesToTime(minutes) {
   return `${String(hours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
 }
 
-const handleSubmit = async () => {
-  console.log(formData.value);
 
-};
 const today = new Date();
 const maxDate = new Date(today);
 maxDate.setMonth(today.getMonth() + 3);
@@ -305,14 +279,16 @@ const maxDateValue = computed(() => {
 
 const selectHour = () => {
 selectedTime.value = selectedTime.value;
+formData.value.time = selectedTime.value;
+
 calculatedValue.value = getSelectedHourTimeToNextReservation (availableTimes.value, selectedTime.value)
 
 const filteredServices = services.filter(service => service.duration <= calculatedValue.value);
 
   availableServices.value = filteredServices
+  
 
 
-console.log(availableTimes.value)
 getLastAppointments(openedHours.value.maxservicetime, openedHours.value.minuterange);
 }
 
@@ -324,7 +300,7 @@ return timeToMinutes(time);
 const ratio = 4;
 const lastAppointments = mapped.slice(-ratio);
 const lastAppointment = mapped.slice(-1);
-console.log("ratio",lastAppointment);
+
 
 
 for(let i = timeToMinutes(timeValue); i <= mapped[mapped.length - 1]; i+=openedHours.value.minuterange){
@@ -347,8 +323,103 @@ availableTimes.value
   return;
 
  }
+ function generateRandomString(length) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charactersLength);
+    result += characters.charAt(randomIndex);
+  }
+  return result;
+}
+const calculateServiceTime = () => {
+  
+  formData.value.selectedservicetime = services[formData.value.selectedservice].duration;
 
+}
+const handleSubmit = async () => {
+
+
+  const token = generateRandomString(10);
+  const link = `http://localhost:3000/confirmation/${token}`;
+  const cancellation = `http://localhost:3000/cancellation/${token}`
+  const message = `Date: ${formData.value.date} Hour:${formData.value.time} Service:${services[formData.value.selectedservice].title} Duration:${formData.value.selectedservicetime} minutes`;
+
+
+
+  const emailParams = {
+    from_name: formData.value.name,
+    to_email: formData.value.email,
+    link: link,
+    cancellation_link: cancellation,
+    message: message,
+  };
+
+  // Envía el correo electrónico
+  emailjs.send('service_87e2u3i', 'template_5d30ygk', emailParams, 'UJc6rUhAnbit4DOGE')
+    .then(async (response) => {
+
+   
+      
+      // Construye los datos para la solicitud POST
+      const appointmentData = {
+        date: formData.value.date,
+        hour: formData.value.time,
+        email: formData.value.email,
+        name: formData.value.name,
+        duration: formData.value.selectedservicetime,
+        token: token, 
+        serviceid: formData.value.selectedservice, 
+        validated: false,
+      };
+
+   
+      const responsePost = await fetch('http://localhost:8080/api/v1/appointment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData),
+      });
+
+      if (responsePost.ok) {
+    
+        errorlogger.value = "Request sent. Please check your e-mail to confirm the appointment.";
+      
+      } else {
+        errorlogger.value = "An error has occurred while confirming the appointment.";
+   
+      }
+    })
+    .catch((error) => {
+      console.error('Error al enviar el correo electrónico:', error);
+      errorlogger.value = "An error has occurred while sending the confirmation e-mail.";
+    });
+};
  
+const fetchAppointmentData = async () => {
+  try {
+    const response = await fetch('http://localhost:8080/api/v1/appointment/');
+    
+    if (response.status === 200) {
+      const jsonData = await response.json();
+      
+      // Mapea los datos al formato deseado y asigna a apidatamock
+      apidatamock = jsonData.data.map((item) => ({
+        reservationId: item.id.toString(),
+        date: item.date,
+        hour: item.hour,
+        duration: parseInt(item.duration), // Convierte la duración a un número entero
+        serviceId: item.serviceid
+      }));
+    } else {
+      console.error('Error en la solicitud GET:', response.status);
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud GET:', error);
+  }
+};
 </script>
 
 
@@ -365,7 +436,7 @@ availableTimes.value
   position: relative;
   
 
-}/* Agrega un pseudo-elemento antes de la imagen para el margen transparente */
+}
 .service-item::before {
   content: '';
   position: absolute;
@@ -374,7 +445,7 @@ availableTimes.value
   width: 100%;
   height: 40px; 
   background-color: white; 
-  z-index: 3;/* Color transparente */
+  z-index: 3;
 }
 
 .service-item:hover::before {
@@ -404,15 +475,12 @@ availableTimes.value
 .service-item img {
   max-width: 20vw;
   height: auto;
-  
-/* Agrega el filtro de escala de grises */
+
 }
 .service-item:hover img {
   max-width: 20vw;
   height: auto;
 
-
-/* Agrega el filtro de escala de grises */
 }
 
 
@@ -431,13 +499,11 @@ availableTimes.value
   max-width: 100vw;
   height: auto;
   
-/* Agrega el filtro de escala de grises */
 }
 .service-item:hover img {
   max-width: 100vw;
   height: auto;
   
-/* Agrega el filtro de escala de grises */
 }
 }
 </style>
