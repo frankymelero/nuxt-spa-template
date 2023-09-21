@@ -339,7 +339,12 @@ const calculateServiceTime = () => {
 
 }
 const handleSubmit = async () => {
+  const nameRegex = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s']{1,30}$/; 
 
+  if(!nameRegex.test(formData.value.name)){
+    errorlogger.value = "Please insert a valid name.";
+    return;
+  }
 
   const token = generateRandomString(10);
   const link = `http://localhost:3000/confirmation/${token}`;
