@@ -10,7 +10,7 @@ const { token } = useRoute().params
 const message = ref("")
 
 const fetchData = async () => {
-    fetch(`http://localhost:8080/api/v1/appointment/validate/${token}`, {
+    fetch(`https://spa-template-backend-express.vercel.app/api/v1/appointment/validate/${token}`, {
   method: 'GET',
 })
   .then((response) => {

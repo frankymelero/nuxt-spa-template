@@ -147,6 +147,7 @@ const formData = ref({
   selectedservicetime: 0,
 });
 
+const emailsent = ref(false);
 
 const selectedTime = ref('');
 
@@ -339,6 +340,11 @@ const calculateServiceTime = () => {
 
 }
 const handleSubmit = async () => {
+
+  if(emailsent.value === true){
+    errorlogger.value = "You have already made an appointment";
+    return;
+  }
   const nameRegex = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s']{1,30}$/; 
 
   if(!nameRegex.test(formData.value.name)){
@@ -346,9 +352,10 @@ const handleSubmit = async () => {
     return;
   }
 
+
   const token = generateRandomString(10);
-  const link = `http://localhost:3000/confirmation/${token}`;
-  const cancellation = `http://localhost:3000/cancellation/${token}`
+  const link = `https://nuxt-spa-template.vercel.app/confirmation/${token}`;
+  const cancellation = `https://nuxt-spa-template.vercel.app/cancellation/${token}`
   const message = `Date: ${formData.value.date} Hour:${formData.value.time} Service:${services[formData.value.selectedservice].title} Duration:${formData.value.selectedservicetime} minutes`;
 
 
@@ -380,7 +387,7 @@ const handleSubmit = async () => {
       };
 
    
-      const responsePost = await fetch('http://localhost:8080/api/v1/appointment', {
+      const responsePost = await fetch('https://spa-template-backend-express.vercel.app/api/v1/appointment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -391,6 +398,7 @@ const handleSubmit = async () => {
       if (responsePost.ok) {
     
         errorlogger.value = "Request sent. Please check your e-mail to confirm the appointment.";
+        emailsent.value = true;
       
       } else {
         errorlogger.value = "An error has occurred while confirming the appointment.";
@@ -405,7 +413,7 @@ const handleSubmit = async () => {
  
 const fetchAppointmentData = async () => {
   try {
-    const response = await fetch('http://localhost:8080/api/v1/appointment/');
+    const response = await fetch('https://spa-template-backend-express.vercel.app/api/v1/appointment/');
     
     if (response.status === 200) {
       const jsonData = await response.json();

@@ -11,7 +11,7 @@ const message = ref("")
 
 const fetchData = async () => {
   try {
-    const response = await fetch(`http://localhost:8080/api/v1/appointment/${token}`, {
+    const response = await fetch(`https://spa-template-backend-express.vercel.app/api/v1/appointment/${token}`, {
       method: 'DELETE',
     });
 
